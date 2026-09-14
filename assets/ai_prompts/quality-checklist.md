@@ -38,6 +38,12 @@
 - Kiểm tra `.con-box` sử dụng `h4`.
 - Kiểm tra `.con-box02` sử dụng `h5`.
 - Kiểm tra `.con-box03` sử dụng `h6`.
+- Kiểm tra Không lồng ghép thẻ bọc thừa (`.con-box02`) trong `.con-box`: Các phần tử nội dung trực tiếp đặt ngang hàng với thẻ `h4` bên trong `.con-box`.
+- Kiểm tra Không dùng thẻ bọc thừa (`.container-box`) trong `.btn-box`: Nút bấm đặt trực tiếp bên trong `.btn-box`.
+- Kiểm tra Xử lý ký tự đặc biệt trong đoạn chú thích (`.mark-p`, `.mark-p01`): BẮT BUỘC XÓA BỎ ký tự hoa thị `※` ở đầu câu của thẻ `<p class="mark-p">` và `<p class="mark-p01">` (vì CSS đã tự sinh ra). Tuyệt đối không giữ lại ký tự này.
+- Kiểm tra Xử lý padding cho đoạn văn cuối cùng: Nếu có nhiều đoạn văn (`.con-p`) liên tiếp, hoặc đoạn văn nằm sát trên `.mark-p`, thẻ `<p>` cuối cùng bắt buộc phải có class `no-pd` (`<p class="con-p no-pd">`).
+- Kiểm tra Caption của Table (`<caption>`): BẮT BUỘC phải có thẻ `<strong>` đi kèm trước `<span>`. Nội dung của thẻ `<strong>` phải lấy chính xác từ thẻ tiêu đề `<h>` nằm ngay phía trên bảng.
+- Kiểm tra Quy tắc định dạng danh sách: KHÔNG dùng thẻ `<p>` và `<br>` để làm danh sách. Các đoạn văn bản có đánh số (1., 2., 3.) phải dùng `<ol class="ol-type01">` và `<li>`. Danh sách gạch đầu dòng dùng `<ul class="ul-type-dot">` hoặc `<ul class="ul-type-bar">` và `<li>`.
 
 ## 5. Kiểm tra Hình ảnh
 - Kiểm tra toàn bộ hình ảnh đã được export.
