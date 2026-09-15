@@ -13,6 +13,7 @@ from flask import Blueprint, request, jsonify
 from routes.helpers import (
     load_data, save_data,
     get_config, make_unique_slug,
+    get_gemini_models_to_try,
     assign_folders_from_roots, delete_menu_files
 )
 
@@ -254,16 +255,25 @@ def api_upload_menus_excel(site_id):
                         'Example Output: {"1": "real-estate-ai", "2": "about-us"}\n\n'
                         'Input: ' + json.dumps(input_dict, ensure_ascii=False) + '\nOutput:'
                     )
-                    response = client.models.generate_content(model='gemini-3.5-flash', contents=prompt)
-                    output_text = response.text.strip()
-                    if output_text.startswith('```'):
-                        output_text = re.sub(r'^```[a-z]*\n|\n```$', '', output_text).strip()
-                    # Extract JSON block in case model adds extra explanations
-                    json_match = re.search(r'\{[^}]+\}', output_text, re.DOTALL)
-                    if json_match:
-                        output_text = json_match.group(0)
+                    output_text = None
+                    for model in get_gemini_models_to_try():
+                        try:
+                            response = client.models.generate_content(model=model, contents=prompt)
+                            if response and response.text:
+                                output_text = response.text.strip()
+                                break
+                        except Exception as me:
+                            print(f"[Menu Slug] Model {model} error: {me}")
+                            continue
+                    if output_text:
+                        if output_text.startswith('```'):
+                            output_text = re.sub(r'^```[a-z]*\n|\n```$', '', output_text).strip()
+                        # Extract JSON block in case model adds extra explanations
+                        json_match = re.search(r'\{[^}]+\}', output_text, re.DOTALL)
+                        if json_match:
+                            output_text = json_match.group(0)
 
-                    slug_dict = json.loads(output_text)
+                        slug_dict = json.loads(output_text)
                     existing_slugs = {m['slug'] for m in site.get('menus', []) if m.get('slug')}
                     for m in new_menus:
                         if m.get('slug'):
@@ -353,12 +363,22 @@ def api_upload_menus_image(site_id):
         - Output NOTHING but the raw JSON array. No markdown blocks, no explanations.
         '''
 
-        response = client.models.generate_content(
-            model='gemini-3.5-flash',
-            contents=[gemini_file, prompt]
-        )
+        output_text = None
+        for model in get_gemini_models_to_try():
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=[gemini_file, prompt]
+                )
+                if response and response.text:
+                    output_text = response.text.strip()
+                    break
+            except Exception as me:
+                print(f"[Menu Image IA] Model {model} error: {me}")
+                continue
 
-        output_text = response.text.strip()
+        if not output_text:
+            raise Exception("All Gemini models failed to parse IA image.")
         
         # Clean up markdown if any
         if output_text.startswith('```json'):
@@ -394,12 +414,22 @@ def api_upload_menus_image(site_id):
                 prompt_slugs += f"ID: {m['id']}, Name: {m['name']}\n"
 
             try:
-                resp_slugs = client.models.generate_content(model='gemini-3.5-flash', contents=prompt_slugs)
-                slugs_text = resp_slugs.text.strip()
-                if slugs_text.startswith('```json'): slugs_text = slugs_text[7:]
-                if slugs_text.endswith('```'): slugs_text = slugs_text[:-3]
-                slugs_text = slugs_text.strip()
-                slug_dict = json.loads(slugs_text)
+                slugs_text = None
+                for model in get_gemini_models_to_try():
+                    try:
+                        resp_slugs = client.models.generate_content(model=model, contents=prompt_slugs)
+                        if resp_slugs and resp_slugs.text:
+                            slugs_text = resp_slugs.text.strip()
+                            break
+                    except Exception as se:
+                        print(f"[Menu Batch Slug] Model {model} error: {se}")
+                        continue
+
+                if slugs_text:
+                    if slugs_text.startswith('```json'): slugs_text = slugs_text[7:]
+                    if slugs_text.endswith('```'): slugs_text = slugs_text[:-3]
+                    slugs_text = slugs_text.strip()
+                    slug_dict = json.loads(slugs_text)
                 
                 existing_slugs = set(m.get('slug', '') for m in new_menus if m.get('slug'))
                 

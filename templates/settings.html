@@ -42,6 +42,27 @@ Email: phongnguyen@andvina.com
             <input type="password" class="form-control" id="gemini_key_2_input" placeholder="Enter Secondary Gemini API Key...">
           </div>
         </div>
+
+        <div class="form-group mt-3 mb-0">
+          <label for="gemini_model_input">Gemini Models Priority List
+            <small class="text-muted ml-2">Enter 1 or multiple models separated by commas (e.g: gemini-3.8-flash, gemini-3.6-flash)</small>
+          </label>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text"><i class="fas fa-microchip text-primary"></i></span>
+            </div>
+            <input type="text" class="form-control" id="gemini_model_input" list="gemini_models_list" placeholder="gemini-3.8-flash, gemini-3.6-flash, gemini-3.5-flash">
+            <datalist id="gemini_models_list">
+              <option value="gemini-3.8-flash, gemini-3.6-flash, gemini-3.5-flash">gemini-3.8-flash, gemini-3.6-flash, gemini-3.5-flash (Recommended Trio)</option>
+              <option value="gemini-3.8-flash">gemini-3.8-flash (Latest & Fast)</option>
+              <option value="gemini-3.6-flash">gemini-3.6-flash</option>
+              <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+              <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+              <option value="gemini-flash-latest">gemini-flash-latest</option>
+            </datalist>
+          </div>
+          <small class="form-text text-muted mt-1"><i class="fas fa-info-circle mr-1"></i>Model đầu tiên là Model chính. Nếu gặp Rate Limit hoặc lỗi, hệ thống sẽ tự động fallback lần lượt sang các model phía sau.</small>
+        </div>
         
         <hr class="my-4">
         
@@ -119,6 +140,9 @@ Email: phongnguyen@andvina.com
           if (data.gemini_api_key_2) {
               document.getElementById('gemini_key_2_input').value = data.gemini_api_key_2;
           }
+          if (data.gemini_model) {
+              document.getElementById('gemini_model_input').value = data.gemini_model;
+          }
           if (data.figma_token) {
               document.getElementById('figma_token_input').value = data.figma_token;
           }
@@ -140,6 +164,7 @@ Email: phongnguyen@andvina.com
           const payload = {
               gemini_api_key: document.getElementById('gemini_key_input').value.trim(),
               gemini_api_key_2: document.getElementById('gemini_key_2_input').value.trim(),
+              gemini_model: document.getElementById('gemini_model_input').value.trim() || 'gemini-3.8-flash',
               figma_token: document.getElementById('figma_token_input').value.trim(),
               show_ui: document.getElementById('show_ui_input').checked,
               slug_method: document.getElementById('slug_method_input').value

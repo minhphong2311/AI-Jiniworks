@@ -14,7 +14,9 @@ from flask import Blueprint, request, jsonify
 from .helpers import (
     load_data, save_data, get_config,
     parse_folder_slug, OUTPUT_DIR,
-    get_css_guide_instruction
+    get_css_guide_instruction,
+    get_default_gemini_model,
+    get_gemini_models_to_try
 )
 
 generate_bp = Blueprint('generate', __name__)
@@ -29,32 +31,27 @@ GENERATE_TASKS = {}
 
 def load_ai_templates():
     structure_template = ''
-    table_template = ''
     form_template = ''
     try:
         import os
         base = os.path.dirname(os.path.dirname(__file__))
         structure_path = os.path.join(base, 'assets', 'ai_prompts', 'structure-template.html')
-        table_path = os.path.join(base, 'assets', 'ai_prompts', 'table-template.html')
         form_path = os.path.join(base, 'assets', 'ai_prompts', 'form-template.html')
         
         if os.path.exists(structure_path):
             with open(structure_path, 'r', encoding='utf-8') as f:
                 structure_template = f.read()
-        if os.path.exists(table_path):
-            with open(table_path, 'r', encoding='utf-8') as f:
-                table_template = f.read()
         if os.path.exists(form_path):
             with open(form_path, 'r', encoding='utf-8') as f:
                 form_template = f.read()
     except Exception as e:
         print(f"Error loading templates: {e}")
-    return structure_template, table_template, form_template
+    return structure_template, form_template
 
 
 
 def get_unified_ai_rules(ai_hint="", css_links=None, conbox_hint="", menu_slug=""):
-    structure_template, table_template, form_template = load_ai_templates()
+    structure_template, form_template = load_ai_templates()
     if css_links is not None:
         css_rules = get_css_guide_instruction(css_links)
     else:
@@ -79,10 +76,6 @@ TEMPLATE RULES TO FOLLOW:
 Structure template: 
 ```html
 {structure_template}
-```
-Table template: 
-```html
-{table_template}
 ```
 Form template: 
 ```html
@@ -161,8 +154,10 @@ def fetch_figma_node(file_key, node_id, token):
             return data
         else:
             print(f"[Figma] API error: {r.status_code} - {r.text[:200]}")
+            return {"error": f"HTTP {r.status_code}: {r.text[:200]}"}
     except Exception as e:
         print(f"[Figma] Request exception: {e}")
+        return {"error": f"Exception: {str(e)}"}
     return None
 
 
@@ -813,7 +808,7 @@ Return ONLY the full updated CSS code. Make sure you apply the requested changes
 If the user complains that it doesn't look like the design, rely on your frontend expertise to tweak margins, paddings, fonts, or colors to make it look professional and beautiful.
 Do not wrap it in markdown block if it causes extra characters, but if you do, I will strip them. Just return valid CSS.
 """
-        models_to_try = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.0-flash-lite']
+        models_to_try = get_gemini_models_to_try(['gemini-3.1-flash-lite', 'gemini-2.0-flash-lite'])
         text = None
         for model in models_to_try:
             try:
@@ -849,7 +844,7 @@ def apply_structural_templates(html, css, js, api_key, menu_name, task_id=None, 
     import os
     import json
 
-    structure_template, table_template, form_template = load_ai_templates()
+    structure_template, form_template = load_ai_templates()
 
     unified_rules = get_unified_ai_rules(ai_hint, menu_slug=menu_name)
     prompt = f"""Bạn là một chuyên gia Frontend Developer.
@@ -899,7 +894,7 @@ Trả lời theo định dạng JSON sau (không thêm gì ngoài JSON, không b
         client = _genai.Client(api_key=api_key)
         client_2 = _genai.Client(api_key=api_key_2) if api_key_2 else None
         
-        models_to_try = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest']
+        models_to_try = get_gemini_models_to_try()
         text = None
         result = None
         for model in models_to_try:
@@ -909,7 +904,7 @@ Trả lời theo định dạng JSON sau (không thêm gì ngoài JSON, không b
                     try:
                         response = client.models.generate_content(model=model, contents=prompt)
                     except Exception as ce:
-                        if client_2 and ('429' in str(ce) or 'quota' in str(ce).lower() or 'exhausted' in str(ce).lower() or 'limit' in str(ce).lower()):
+                        if client_2 and ('429' in str(ce) or '400' in str(ce) or 'invalid' in str(ce).lower() or 'quota' in str(ce).lower() or 'exhausted' in str(ce).lower() or 'limit' in str(ce).lower()):
                             print(f"[{menu_name}] Primary API Key limit reached! Switching to Fallback Key...")
                             client = client_2
                             client_2 = None
@@ -975,7 +970,7 @@ def compare_and_fix_visuals(token, figma_link, html, css, js, css_links, menu_na
     if not hasattr(compare_and_fix_visuals, 'api_lock'):
         compare_and_fix_visuals.api_lock = threading.Semaphore(1)
 
-    structure_template, table_template, form_template = load_ai_templates()
+    structure_template, form_template = load_ai_templates()
     quality_checklist = ''
     try:
         base = os.path.dirname(os.path.dirname(__file__))
@@ -1185,7 +1180,7 @@ STATUS: PERFECT (or NEEDS_FIX)
                 text = 'STATUS: NEEDS_FIX\n\n```html\n<div class="content-box"><div class="con-box"><h4 class="h4-tit01">Demo Title</h4><p class="con-p">Mock response.</p></div></div>\n```\n\n```css\n.content-box { padding: 20px; }\n```'
             else:
                 with compare_and_fix_visuals.api_lock:
-                    models_to_try = ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-flash-latest', 'gemini-3.5-flash']
+                    models_to_try = get_gemini_models_to_try(['gemini-2.0-flash-lite'])
                     text = None
                     last_error = None
                     for model in models_to_try:
@@ -1205,7 +1200,7 @@ STATUS: PERFECT (or NEEDS_FIX)
                                         contents=contents_to_send
                                     )
                                 except Exception as ce:
-                                    if client_2 and ('429' in str(ce) or 'quota' in str(ce).lower() or 'exhausted' in str(ce).lower() or 'limit' in str(ce).lower()):
+                                    if client_2 and ('429' in str(ce) or '400' in str(ce) or 'invalid' in str(ce).lower() or 'quota' in str(ce).lower() or 'exhausted' in str(ce).lower() or 'limit' in str(ce).lower()):
                                         print(f"[{menu_name}] Primary API Key limit reached! Switching to Fallback Key...")
                                         client = client_2
                                         client_2 = None
@@ -1308,8 +1303,13 @@ def run_generate_async(task_id, site_id, menu_param, target_dir, figma_token, co
 
             check_cancel_and_update("Fetching Figma design...")
             design_data = fetch_figma_node(file_key, node_id, figma_token)
-            if not design_data or 'nodes' not in design_data or node_id not in design_data['nodes']:
-                raise Exception("Could not fetch design from Figma API.")
+            if not design_data:
+                raise Exception("Could not fetch design from Figma API (Network or Token error).")
+            if 'error' in design_data:
+                raise Exception(f"Figma API Error: {design_data['error']}")
+            if 'nodes' not in design_data or node_id not in design_data['nodes']:
+                err_msg = design_data.get('err', 'Unknown error')
+                raise Exception(f"Could not fetch design from Figma API. Reason: {err_msg}")
 
             check_cancel_and_update("Downloading assets...")
             document = design_data['nodes'][node_id]['document']
@@ -1413,7 +1413,7 @@ def run_generate_async(task_id, site_id, menu_param, target_dir, figma_token, co
                         break
                     except Exception as up_e:
                         err_str = str(up_e)
-                        if client_2 and ('429' in err_str or 'quota' in err_str.lower() or 'exhausted' in err_str.lower() or 'limit' in err_str.lower()):
+                        if client_2 and ('429' in err_str or '400' in err_str or 'invalid' in err_str.lower() or 'quota' in err_str.lower() or 'exhausted' in err_str.lower() or 'limit' in err_str.lower()):
                             print(f"[{menu_slug}] Primary API Key limit reached during Image Upload! Switching to Fallback Key...")
                             check_cancel_and_update("Upload quota reached. Switching to Fallback API Key...")
                             client = client_2
@@ -1452,7 +1452,7 @@ def run_generate_async(task_id, site_id, menu_param, target_dir, figma_token, co
             
             GENERATE_TASKS[task_id] = {"status": "running", "message": "Generating HTML/CSS from Images..."}
             
-            structure_template, _, _ = load_ai_templates()
+            structure_template, form_template = load_ai_templates()
             
             num_images = len(gemini_files)
             conbox_hint = f"The user provided {num_images} image(s). This EXACTLY MEANS there are {num_images} main sections in the design. You MUST create exactly {num_images} `<div class=\"con-box\">` elements inside `.content-box`, each corresponding chronologically to one of the images provided." if num_images > 0 else ""
@@ -1486,7 +1486,7 @@ Return ONLY a valid JSON object matching this schema without markdown formatting
             contents = gemini_files + [prompt]
             import time
             import re
-            models_to_try = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest']
+            models_to_try = get_gemini_models_to_try()
             max_retries = 3
             response = None
             current_key_name = "Primary Key"
@@ -1503,7 +1503,7 @@ Return ONLY a valid JSON object matching this schema without markdown formatting
                         break
                     except Exception as ce:
                         err_str = str(ce)
-                        if client_2 and ('429' in err_str or 'quota' in err_str.lower() or 'exhausted' in err_str.lower() or 'limit' in err_str.lower()):
+                        if client_2 and ('429' in err_str or '400' in err_str or 'invalid' in err_str.lower() or 'quota' in err_str.lower() or 'exhausted' in err_str.lower() or 'limit' in err_str.lower()):
                             print(f"[{menu_slug}] Primary API Key limit reached in Image-to-HTML! Switching to Fallback Key...")
                             check_cancel_and_update("Rate limit hit! Switching to Fallback API Key...")
                             client = client_2
@@ -1678,7 +1678,7 @@ def generate_files(site_id, menu_param):
     task_id = f"gen--{site_id}--{folder}--{menu_slug}"
 
     if GENERATE_TASKS.get(task_id, {}).get('status') == 'running':
-        return jsonify({'success': False, 'message': 'Page is currently generating!'})
+        return jsonify({'success': True, 'task_id': task_id, 'message': 'Page is currently generating!', 'already_running': True})
 
     # Clear old deploy task to prevent stale "Successfully deployed" status
     original_folder, _ = parse_folder_slug(menu_param)

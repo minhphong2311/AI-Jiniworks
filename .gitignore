@@ -17,3 +17,4 @@ playwright_data/
 
 debug_scripts/
 CHANGELOG.md
+*.code-workspace

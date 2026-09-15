@@ -1373,6 +1373,7 @@ function restoreGenerateTasks() {
 document.addEventListener('DOMContentLoaded', function() {
     restoreGenerateTasks();
 });
+
 function generateFiles(siteId, menuSlug, btnElement) {
     const btnDep = document.getElementById(`deploy-list-form-${menuSlug}`);
     if (btnDep && btnDep.disabled && btnDep.innerHTML.includes('fa-spinner')) {
@@ -1380,11 +1381,16 @@ function generateFiles(siteId, menuSlug, btnElement) {
         return;
     }
 
-    const originalContent = '<i class="fas fa-cogs"></i>';
-    const originalTitle = btnElement.title;
-    btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    btnElement.title = 'Initializing...';
-    btnElement.disabled = true;
+    const btnList = document.getElementById(`generate-list-btn-${menuSlug}`);
+    const btnGrid = document.getElementById(`generate-grid-btn-${menuSlug}`);
+    const setBtnLoading = (btn) => {
+        if (!btn) return;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.title = 'Initializing...';
+        btn.disabled = true;
+    };
+    setBtnLoading(btnList);
+    setBtnLoading(btnGrid);
 
     const statusInfo = document.getElementById(`build-status-info-${menuSlug}`);
     const listStatusInfo = document.getElementById(`build-status-info-list-${menuSlug}`);
@@ -1400,27 +1406,52 @@ function generateFiles(siteId, menuSlug, btnElement) {
         type: 'POST',
         success: function(response) {
             if (response.success && response.task_id) {
-                btnElement.disabled = false;
-                btnElement.classList.remove('btn-primary');
-                btnElement.classList.add('btn-danger');
-                btnElement.innerHTML = '<i class="fas fa-times-circle"></i>';
-                btnElement.title = 'Stop Generation';
-                btnElement.onclick = function() { cancelGenerate(response.task_id, btnElement, menuSlug, siteId); };
+                const updateToCancel = (btn) => {
+                    if (!btn) return;
+                    btn.disabled = false;
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-danger');
+                    btn.innerHTML = '<i class="fas fa-times-circle"></i>';
+                    btn.title = 'Stop Generation';
+                    btn.onclick = function() { cancelGenerate(response.task_id, btn, menuSlug, siteId); };
+                };
+                updateToCancel(btnList);
+                updateToCancel(btnGrid);
+
+                if (response.already_running) {
+                    Swal.fire({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2500, icon: 'info', title: 'Running', text: 'Page is already generating. Connecting...' });
+                }
                 
-                pollGenerateTask(response.task_id, menuSlug, btnElement, siteId);
+                pollGenerateTask(response.task_id, menuSlug, btnList || btnGrid || btnElement, siteId);
             } else {
-                btnElement.disabled = false;
-                btnElement.innerHTML = originalContent;
-                btnElement.title = originalTitle;
+                const revertToOriginal = (btn) => {
+                    if (!btn) return;
+                    btn.disabled = false;
+                    btn.classList.remove('btn-danger');
+                    btn.classList.add('btn-primary');
+                    btn.innerHTML = '<i class="fas fa-cogs"></i>';
+                    btn.title = 'Generate';
+                    btn.onclick = function() { generateFiles(siteId, menuSlug, btn); };
+                };
+                revertToOriginal(btnList);
+                revertToOriginal(btnGrid);
                 if (statusInfo) statusInfo.innerHTML = `<span class="text-danger"><i class="fas fa-exclamation-triangle mr-1"></i> ${response.message}</span>`;
                 if (listStatusInfo) listStatusInfo.innerHTML = `<span class="text-danger"><i class="fas fa-exclamation-triangle mr-1"></i> ${response.message}</span>`;
                 Swal.fire({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, icon: 'error', title: 'Error', text: response.message });
             }
         },
         error: function(xhr) {
-            btnElement.disabled = false;
-            btnElement.innerHTML = originalContent;
-            btnElement.title = originalTitle;
+            const revertToOriginal = (btn) => {
+                if (!btn) return;
+                btn.disabled = false;
+                btn.classList.remove('btn-danger');
+                btn.classList.add('btn-primary');
+                btn.innerHTML = '<i class="fas fa-cogs"></i>';
+                btn.title = 'Generate';
+                btn.onclick = function() { generateFiles(siteId, menuSlug, btn); };
+            };
+            revertToOriginal(btnList);
+            revertToOriginal(btnGrid);
             if (statusInfo) statusInfo.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle mr-1"></i> Server connection error</span>';
             if (listStatusInfo) listStatusInfo.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle mr-1"></i> Server connection error</span>';
             Swal.fire({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, icon: 'error', title: 'Connection Error', text: 'Please try again.' });
@@ -1429,9 +1460,16 @@ function generateFiles(siteId, menuSlug, btnElement) {
 }
 
 function cancelGenerate(taskId, btnElement, menuSlug, siteId) {
-    btnElement.disabled = true;
-    btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    btnElement.title = 'Stopping...';
+    const btnList = document.getElementById(`generate-list-btn-${menuSlug}`);
+    const btnGrid = document.getElementById(`generate-grid-btn-${menuSlug}`);
+    const setStopping = (btn) => {
+        if (!btn) return;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.title = 'Stopping...';
+    };
+    setStopping(btnList);
+    setStopping(btnGrid);
     $.ajax({
         url: `/api/generate_cancel/${taskId}`,
         type: 'POST',
@@ -1446,7 +1484,7 @@ function pollGenerateTask(taskId, menuSlug, btnElement, siteId) {
     const statusInfo = document.getElementById(`build-status-info-${menuSlug}`);
     const listStatusInfo = document.getElementById(`build-status-info-list-${menuSlug}`);
     
-    generatePollingIntervals[taskId] = setInterval(() => {
+    const checkStatus = () => {
         $.ajax({
             url: '/api/generate_status',
             type: 'GET',
@@ -1459,6 +1497,7 @@ function pollGenerateTask(taskId, menuSlug, btnElement, siteId) {
                     if (listStatusInfo) listStatusInfo.innerHTML = `<span class="text-primary"><i class="fas fa-circle-notch fa-spin mr-1"></i> ${task.message || 'Generating...'}</span>`;
                 } else {
                     clearInterval(generatePollingIntervals[taskId]);
+                    delete generatePollingIntervals[taskId];
                     
                     const revertBtn = (btn) => {
                         if (!btn) return;
@@ -1495,9 +1534,17 @@ function pollGenerateTask(taskId, menuSlug, btnElement, siteId) {
                         if(document.getElementById(`deploy-list-form-${menuSlug}`)) document.getElementById(`deploy-list-form-${menuSlug}`).style.display = 'inline-flex';
                         if(document.getElementById(`deploy-list-disabled-${menuSlug}`)) document.getElementById(`deploy-list-disabled-${menuSlug}`).style.display = 'none';
                         
-                        const card = btnElement.closest('.card');
-                        card.classList.remove('card-secondary');
-                        card.classList.add('card-success');
+                        const card = btnElement ? btnElement.closest('.card') : null;
+                        if (card) {
+                            card.classList.remove('card-secondary');
+                            card.classList.add('card-success');
+                        }
+                        const gridBtn = document.getElementById(`generate-grid-btn-${menuSlug}`);
+                        const gridCard = gridBtn ? gridBtn.closest('.card') : null;
+                        if (gridCard) {
+                            gridCard.classList.remove('card-secondary');
+                            gridCard.classList.add('card-success');
+                        }
                         
                         Swal.fire({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, icon: 'success', title: 'Success!', text: task.message });
                     } else if (task.status === 'error' || task.status === 'cancelled') {
@@ -1510,7 +1557,10 @@ function pollGenerateTask(taskId, menuSlug, btnElement, siteId) {
                 }
             }
         });
-    }, 1000);
+    };
+
+    checkStatus();
+    generatePollingIntervals[taskId] = setInterval(checkStatus, 1000);
 }
 
 function deployFiles(siteId, menuSlug, folder, paramKey, btnElement) {

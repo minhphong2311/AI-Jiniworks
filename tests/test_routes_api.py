@@ -88,3 +88,27 @@ def test_save_and_get_code_api(client):
     assert "History detail" in code_data["html"]
     assert ".history-content" in code_data["css"]
     assert "console.log('history');" in code_data["js"]
+
+
+def test_generate_already_running(client):
+    from routes.generate import GENERATE_TASKS
+    task_id = "gen--testsite01--about-us--history"
+    GENERATE_TASKS[task_id] = {"status": "running", "message": "Analyzing..."}
+    try:
+        response = client.post("/site/testsite01/generate/about-us--history")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data.get("success") is True
+        assert data.get("already_running") is True
+        assert data.get("task_id") == task_id
+    finally:
+        GENERATE_TASKS.pop(task_id, None)
+
+
+def test_load_ai_templates():
+    from routes.generate import load_ai_templates
+    templates = load_ai_templates()
+    assert len(templates) == 2
+    structure_template, form_template = templates
+    assert isinstance(structure_template, str)
+    assert isinstance(form_template, str)

@@ -123,10 +123,11 @@ def render_preview_index(site_id, folder, menu_slug):
             if not image_paths and menu.get('image_path'):
                 image_paths = [menu.get('image_path')]
             
+    menu_param = f"{folder}--{menu_slug}" if folder else menu_slug
     return render_template(
         'preview_frame.html',
         site_id=site_id,
-        menu_param=f"{folder}--{menu_slug}",
+        menu_param=menu_param,
         folder=folder,
         menu_slug=menu_slug,
         menu_name=menu_name,
@@ -143,12 +144,15 @@ def preview_index(site_id, folder, slug):
 
 @preview_bp.route('/preview/<site_id>/<slug>.do')
 def preview_index_no_folder(site_id, slug):
-    return render_preview_index(site_id, slug, slug)
+    return render_preview_index(site_id, "", slug)
 
 
 @preview_bp.route('/preview/raw/<site_id>/<folder>/<slug>.html')
 def preview_raw(site_id, folder, slug):
-    dir_path = os.path.join(OUTPUT_DIR, site_id, folder)
+    if folder:
+        dir_path = os.path.join(OUTPUT_DIR, site_id, folder)
+    else:
+        dir_path = os.path.join(OUTPUT_DIR, site_id)
     html_path = os.path.join(dir_path, f'{slug}.html')
 
     if not os.path.exists(html_path):
@@ -161,6 +165,9 @@ def preview_raw(site_id, folder, slug):
     html_content = html_content.replace(
         f'href="{slug}.css"',
         f'href="{slug}.css?t={t}"'
+    ).replace(
+        f'src="{slug}.js"',
+        f'src="{slug}.js?t={t}"'
     )
 
     response = make_response(html_content)
@@ -170,7 +177,7 @@ def preview_raw(site_id, folder, slug):
 
 @preview_bp.route('/preview/raw/<site_id>/<slug>.html')
 def preview_raw_no_folder(site_id, slug):
-    return preview_raw(site_id, slug, slug)
+    return preview_raw(site_id, "", slug)
 
 
 @preview_bp.route('/preview/raw/<site_id>/<folder>/<path:filename>')

@@ -18,6 +18,8 @@ app.secret_key = 'super-secret-key-for-cms-builder'
 from routes.helpers import (
     load_data, save_data,
     get_config, save_config,
+    get_default_gemini_model,
+    get_gemini_models_to_try,
     generate_slug_for_text,
     assign_folders_from_roots,
     parse_folder_slug,
@@ -247,6 +249,7 @@ def api_get_config():
         'success': True,
         'gemini_api_key': config.get('gemini_api_key', ''),
         'gemini_api_key_2': config.get('gemini_api_key_2', ''),
+        'gemini_model': config.get('gemini_model', get_default_gemini_model()),
         'figma_token': config.get('figma_token', ''),
         'show_ui': config.get('show_ui', True),
         'slug_method': config.get('slug_method', 'google')
@@ -261,6 +264,8 @@ def api_save_config():
         config['gemini_api_key'] = data['gemini_api_key']
     if 'gemini_api_key_2' in data:
         config['gemini_api_key_2'] = data['gemini_api_key_2']
+    if 'gemini_model' in data:
+        config['gemini_model'] = data['gemini_model'].strip() or 'gemini-3.8-flash'
     if 'figma_token' in data:
         config['figma_token'] = data['figma_token']
     if 'show_ui' in data:
@@ -327,16 +332,11 @@ def api_chat():
         }), 400
 
     structure_template = ''
-    table_template = ''
     structure_path = os.path.join(app.root_path, 'assets', 'ai_prompts', 'structure-template.html')
-    table_path = os.path.join(app.root_path, 'assets', 'ai_prompts', 'table-template.html')
 
     if os.path.exists(structure_path):
         with open(structure_path, 'r', encoding='utf-8') as f:
             structure_template = f.read()
-    if os.path.exists(table_path):
-        with open(table_path, 'r', encoding='utf-8') as f:
-            table_template = f.read()
 
     try:
         from google import genai as _genai
@@ -375,11 +375,6 @@ TÀI LIỆU THAM KHẢO VỀ CẤU TRÚC VÀ SUB-TEMPLATE MÀ BẠN NÊN ÁP D�
 Mẫu cấu trúc giao diện chung (structure-template.html):
 ```html
 {structure_template}
-```
-
-Mẫu bảng (table-template.html):
-```html
-{table_template}
 ```
 
 Nhiệm vụ:
@@ -448,41 +443,55 @@ Trả lời theo định dạng JSON sau (không thêm gì ngoài JSON, không b
         
         import time
         import re
-        max_retries = 3
+        models_to_try = get_gemini_models_to_try()
         response = None
-        for attempt in range(max_retries):
-            try:
-                response = client.models.generate_content(
-                    model='gemini-3.6-flash', 
-                    contents=contents,
-                    config=gen_config
-                )
-                break
-            except Exception as e:
-                err_str = str(e)
-                if client_2 and ('429' in err_str or 'quota' in err_str.lower() or 'exhausted' in err_str.lower() or 'limit' in err_str.lower()):
-                    print("[Chat AI] Rate limit hit. Switching to Fallback API Key...")
-                    client = client_2
-                    client_2 = None
-                    try:
-                        response = client.models.generate_content(
-                            model='gemini-3.6-flash',
-                            contents=contents,
-                            config=gen_config
-                        )
+        last_err = None
+
+        for model in models_to_try:
+            for attempt in range(2):
+                try:
+                    print(f"[Chat AI] Calling model {model} (Attempt {attempt+1})...")
+                    response = client.models.generate_content(
+                        model=model, 
+                        contents=contents,
+                        config=gen_config
+                    )
+                    break
+                except Exception as e:
+                    last_err = e
+                    err_str = str(e)
+                    if client_2 and ('429' in err_str or '400' in err_str or 'invalid' in err_str.lower() or 'quota' in err_str.lower() or 'exhausted' in err_str.lower() or 'limit' in err_str.lower()):
+                        print(f"[Chat AI] Primary API Key error ({err_str[:80]}). Switching to Fallback API Key...")
+                        client = client_2
+                        client_2 = None
+                        try:
+                            response = client.models.generate_content(
+                                model=model,
+                                contents=contents,
+                                config=gen_config
+                            )
+                            break
+                        except Exception as fallback_e:
+                            last_err = fallback_e
+                            err_str = str(fallback_e)
+                    
+                    if '429' in err_str and 'RESOURCE_EXHAUSTED' in err_str and attempt < 1:
+                        match = re.search(r'retry in (\d+\.\d+|\d+)s', err_str)
+                        wait_time = float(match.group(1)) + 1 if match else 5.0
+                        if wait_time <= 15:
+                            print(f"[Chat AI] Rate limit hit. Waiting {wait_time}s before retry...")
+                            time.sleep(wait_time)
+                        else:
+                            print(f"[Chat AI] Retry wait too long ({wait_time}s). Trying next fallback model...")
+                            break
+                    else:
+                        print(f"[Chat AI] Model {model} failed: {err_str[:120]}. Trying next model...")
                         break
-                    except Exception as fallback_e:
-                        err_str = str(fallback_e)
-                
-                if '429' in err_str and 'RESOURCE_EXHAUSTED' in err_str and attempt < max_retries - 1:
-                    match = re.search(r'retry in (\d+\.\d+|\d+)s', err_str)
-                    wait_time = float(match.group(1)) + 1 if match else 20.0
-                    print(f"[Chat AI] Rate limit hit. Waiting {wait_time}s before retry...")
-                    if wait_time > 65:
-                        raise Exception("Đã vượt quá giới hạn API. Vui lòng thử lại sau vài phút hoặc dùng Key khác.")
-                    time.sleep(wait_time)
-                else:
-                    raise
+            if response and response.text:
+                break
+
+        if not response or not response.text:
+            raise last_err or Exception("All Gemini models failed. Please verify your API Key and limits.")
         text = response.text.strip()
 
         import json as _json
