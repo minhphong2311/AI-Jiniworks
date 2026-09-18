@@ -29,14 +29,7 @@ description: Kích hoạt khi cần tự động sinh mã HTML/CSS từ thiết 
 
 ## Vòng lặp Phản chiếu Thị giác Gemini (Visual Reflection Loop - 100% Figma Match)
 - Tự động chụp ảnh màn hình giao diện sinh ra bằng Playwright và gửi kèm ảnh thiết kế Figma cho Gemini Vision (`gemini-3.6-flash` với cơ chế retry tự động). 
-- AI kiểm tra và sửa lỗi trực tiếp theo **Checklist 7 bước** (`assets/ai_prompts/quality-checklist.md`):
-  1. Layout (bố cục, kích thước, vị trí, căn lề, màu sắc).
-  2. Typography (font-family, font-size, font-weight, line-height, letter-spacing, màu chữ, khoảng cách đoạn).
-  3. HTML & Class (thẻ HTML chuẩn, Typography Class và HTML Template `.con-box → h4`, `.con-box02 → h5`, `.con-box03 → h6`).
-  4. Hình ảnh (export đầy đủ, định dạng .jpg/.png, kích thước, đường dẫn).
-  5. Responsive (Desktop, Tablet, Mobile, không vỡ layout).
-  6. Chức năng (link, button, hover).
-  7. So sánh 100% với Figma: Chỉnh sửa lại HTML/CSS cho tới khi khớp hoàn toàn thiết kế.
+- AI kiểm tra và sửa lỗi trực tiếp theo bộ quy chuẩn duy nhất tại `assets/ai_prompts/quality-checklist.md`.
 - **Quản lý File Tạm (Temp Files Cleanup):** Mọi file sinh ra trong quá trình kiểm tra (như `temp_render_...png`, `temp_target_...png`, v.v.) BẮT BUỘC phải lưu vào thư mục `scratch/` và tự động XÓA SẠCH ngay sau khi hoàn tất. Không được xả rác ra thư mục output gốc.
 
 ## Semantic Image Renaming (Đổi tên ảnh ngữ nghĩa)

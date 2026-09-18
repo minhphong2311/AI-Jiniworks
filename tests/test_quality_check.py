@@ -94,3 +94,21 @@ class TestVerifyErrorFallback:
         except Exception:
             pass
         assert broke is False
+
+class TestQualityChecklistFile:
+    def test_single_source_of_truth_file_exists(self):
+        import os
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        checklist_md = os.path.join(base_dir, 'assets', 'ai_prompts', 'quality-checklist.md')
+        checklist_txt = os.path.join(base_dir, 'assets', 'ai_prompts', 'quality_checklist.txt')
+        
+        # quality-checklist.md must exist and be non-empty
+        assert os.path.exists(checklist_md), "quality-checklist.md must exist"
+        with open(checklist_md, 'r', encoding='utf-8') as f:
+            content = f.read()
+        assert len(content) > 1000, "quality-checklist.md must have full content"
+        assert '<svg>' in content, "Must contain SVG restriction"
+        assert 'h4' in content, "Must contain heading hierarchy rule"
+
+        # Deprecated txt file must be gone
+        assert not os.path.exists(checklist_txt), "quality_checklist.txt must be removed"

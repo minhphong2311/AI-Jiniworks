@@ -61,6 +61,7 @@
 - Kiểm tra không có CSS dư thừa.
 - Kiểm tra không sử dụng inline style.
 - Kiểm tra không sử dụng mã data:image/svg+xml trong CSS background-image.
+- Đối với các đường kẻ hoặc đường nối giữa các khối hộp: BẮT BUỘC chỉ sử dụng pseudo-elements CSS (::before và ::after) trên các khối để vẽ, không tạo thẻ div bọc hoặc ảnh rác.
 - Kiểm tra animation và transition (nếu có).
 
 ## 7. Kiểm tra Responsive
@@ -104,3 +105,5 @@
 - Xác nhận toàn bộ giao diện giống với thiết kế Figma.
 - Xác nhận toàn bộ Rule của dự án đã được tuân thủ.
 - Xác nhận Preview giống thiết kế trước khi hoàn thành.
+
+**LƯU Ý NGHIÊM NGẶT:** Phải kiểm tra thị giác với độ sắc bén và chi tiết cao nhất. Không được bỏ qua bất kỳ sai lệch nào. Nếu phát hiện bất kỳ sự khác biệt nào về mũi tên, icon, đường kẻ, màu sắc, font chữ hoặc bố cục so với thiết kế Figma, BẮT BUỘC phải chỉ rõ điểm cần sửa và trả về `STATUS: NEEDS_FIX`!

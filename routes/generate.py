@@ -1001,9 +1001,7 @@ def compare_and_fix_visuals(token, figma_link, html, css, js, css_links, menu_na
     quality_checklist = ''
     try:
         base = os.path.dirname(os.path.dirname(__file__))
-        checklist_path = os.path.join(base, 'assets', 'ai_prompts', 'quality_checklist.txt')
-        
-
+        checklist_path = os.path.join(base, 'assets', 'ai_prompts', 'quality-checklist.md')
         if os.path.exists(checklist_path):
             with open(checklist_path, 'r', encoding='utf-8') as f:
                 quality_checklist = f.read()
