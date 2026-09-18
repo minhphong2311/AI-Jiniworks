@@ -112,3 +112,63 @@ class TestQualityChecklistFile:
 
         # Deprecated txt file must be gone
         assert not os.path.exists(checklist_txt), "quality_checklist.txt must be removed"
+
+class TestButtonIconArrowRule:
+    def test_checklist_and_rules_contain_button_icon_instructions(self):
+        import os
+        from routes.generate import get_unified_ai_rules
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        checklist_md = os.path.join(base_dir, 'assets', 'ai_prompts', 'quality-checklist.md')
+        
+        with open(checklist_md, 'r', encoding='utf-8') as f:
+            checklist_content = f.read()
+        assert '↗' in checklist_content, "quality-checklist.md must mention arrow icon symbol ↗"
+        assert '::before' in checklist_content, "Must mention pseudo-elements"
+
+        unified_rules = get_unified_ai_rules()
+        assert 'BUTTON ICON & ARROW RULE' in unified_rules
+        assert '↗' in unified_rules
+
+    def test_clean_button_text_arrows(self):
+        from routes.generate import clean_button_text_arrows
+
+        # Trailing unicode arrow in a.btn
+        html_input = '<a class="btn btn-link" href="#" target="_blank" title="관련 링크 01 바로가기">관련 링크 01 ↗</a>'
+        expected = '<a class="btn btn-link" href="#" target="_blank" title="관련 링크 01 바로가기">관련 링크 01</a>'
+        assert clean_button_text_arrows(html_input) == expected
+
+        # Right arrow in button
+        html_btn = '<button type="button" class="btn btn-primary">자세히 보기 →</button>'
+        assert clean_button_text_arrows(html_btn) == '<button type="button" class="btn btn-primary">자세히 보기</button>'
+
+        # Arrow inside nested span in link-btn
+        html_span = '<a class="link-btn" href="#"><span>관련 링크 02 ›</span></a>'
+        assert clean_button_text_arrows(html_span) == '<a class="link-btn" href="#"><span>관련 링크 02</span></a>'
+
+        # Leading arrow
+        html_lead = '<a class="btn btn-file" href="#">➔ 다운로드</a>'
+        assert clean_button_text_arrows(html_lead) == '<a class="btn btn-file" href="#">다운로드</a>'
+
+        # Regular paragraph text with arrow should NOT be altered
+        html_p = '<p class="con-p">Bước 1 → Bước 2</p>'
+        assert clean_button_text_arrows(html_p) == html_p
+
+class TestHeadingHierarchyRule:
+    def test_checklist_and_unified_rules_heading_hierarchy(self):
+        import os
+        from routes.generate import get_unified_ai_rules
+        from routes.helpers import get_css_guide_instruction
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        checklist_md = os.path.join(base_dir, 'assets', 'ai_prompts', 'quality-checklist.md')
+
+        with open(checklist_md, 'r', encoding='utf-8') as f:
+            checklist_content = f.read()
+        assert 'h4.h4-tit01' in checklist_content
+        assert 'KHÔNG dùng `h5` hoặc `h6` thay thế `h4`' in checklist_content
+
+        unified_rules = get_unified_ai_rules()
+        assert 'Direct heading of `.con-box` MUST ALWAYS be `h4.h4-tit01`' in unified_rules
+
+        css_guide = get_css_guide_instruction()
+        assert 'Tiêu đề trực tiếp của `.con-box` BẮT BUỘC LUÔN là `h4.h4-tit01`' in css_guide
+

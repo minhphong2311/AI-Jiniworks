@@ -36,15 +36,16 @@
 - Kiểm tra không tạo class không cần thiết.
 - Kiểm tra sử dụng đúng Typography Class của dự án.
 - Kiểm tra sử dụng đúng HTML Template của dự án.
-- Kiểm tra `.con-box` sử dụng `h4`.
-- Kiểm tra `.con-box02` sử dụng `h5`.
-- Kiểm tra `.con-box03` sử dụng `h6`.
-- Kiểm tra Không lồng ghép thẻ bọc thừa (`.con-box02`) trong `.con-box`: Các phần tử nội dung trực tiếp đặt ngang hàng với thẻ `h4` bên trong `.con-box`.
+- Kiểm tra `.con-box` LUÔN sử dụng `h4.h4-tit01` làm tiêu đề trực tiếp (ngay bên trong `.con-box`, KHÔNG dùng `h5` hoặc `h6` thay thế `h4` ở cấp này dù content ngắn hay dài).
+- Kiểm tra `.con-box02` sử dụng `h5.h5-tit01`. Lưu ý: `h5` KHÔNG được đặt trực tiếp trong `.con-box`; nếu có `h5` thì phải bọc trong `.con-box02` HOẶC bên trong một component con như `.bg-box`, `.notice-box`, `.info-wrap` (chứ không phải là tiêu đề cấp `.con-box`).
+- Kiểm tra `.con-box03` sử dụng `h6.h6-tit01`. Quy tắc tương tự: `h6` đặt trong `.con-box03` HOẶC trong component con, KHÔNG phải tiêu đề trực tiếp của `.con-box`.
+- Kiểm tra Không lồng ghép thẻ bọc thừa (`.con-box02`, `.con-box03`) vào trong `.con-box` chỉ để chứa `h5`/`h6` đứng đơn lẻ khi đã có component con phù hợp (`.bg-box`, `.notice-box`). Nếu component con đã chứa `h5`/`h6`, KHÔNG cần thêm `.con-box02`/`.con-box03` bọc ngoài.
 - Kiểm tra Không dùng thẻ bọc thừa (`.container-box`) trong `.btn-box`: Nút bấm đặt trực tiếp bên trong `.btn-box`.
 - Kiểm tra Xử lý ký tự đặc biệt trong đoạn chú thích (`.mark-p`): BẮT BUỘC XÓA BỎ ký tự hoa thị `※` ở đầu câu của thẻ `<p class="mark-p">` (vì CSS đã tự sinh ra). Tuyệt đối không giữ lại ký tự này.
 - Kiểm tra Xử lý padding cho đoạn văn cuối cùng: Nếu có nhiều đoạn văn (`.con-p`) liên tiếp, hoặc đoạn văn nằm sát trên `.mark-p`, thẻ `<p>` cuối cùng bắt buộc phải có class `no-pd` (`<p class="con-p no-pd">`).
 - Kiểm tra Caption của Table (`<caption>`): BẮT BUỘC phải có thẻ `<strong>` đi kèm trước `<span>`. Nội dung của thẻ `<strong>` phải lấy chính xác từ thẻ tiêu đề `<h>` nằm ngay phía trên bảng.
 - Kiểm tra Quy tắc định dạng danh sách: KHÔNG dùng thẻ `<p>` và `<br>` để làm danh sách. Các đoạn văn bản có đánh số (1., 2., 3.) phải dùng `<ol class="ol-type01">` và `<li>`. Danh sách gạch đầu dòng dùng `<ul class="ul-type-dot">` hoặc `<ul class="ul-type-bar">` và `<li>`.
+- Kiểm tra Nút bấm & Biểu tượng (Button & Link Icons): TUYỆT ĐỐI KHÔNG để các ký tự mũi tên hoặc icon (như `↗`, `→`, `➔`, `➜`, `›`, `»`, `▼`, `▲`, `+`, `↓`, v.v.) dưới dạng text thuần (unicode) bên trong nội dung văn bản của thẻ nút bấm (`<a>`, `<button>`, `.btn`, `.btn-link`, `.btn-file`, `.link-btn`). Mọi mũi tên hoặc biểu tượng đi kèm nút bấm BẮT BUỘC phải là ICON (dùng class có sẵn như `.btn-link` có `ico-open.png` qua `::before`, `.btn-file` có `ico-download.png` qua `::before`, hoặc dùng ảnh `.png` qua CSS pseudo-element). Nội dung text bên trong nút bấm CHỈ chứa nhãn chữ thuần túy (VD: `<a class="btn btn-link" ...>관련 링크 01</a>`). Ưu tiên tái sử dụng (override) trực tiếp `.btn-link:before` (hoặc `.btn-file:before`) đã có sẵn trong `style.css` thay vì tạo thêm `::after`. Nếu bắt buộc phải dùng `::after`, BẮT BUỘC phải tắt hoàn toàn `::before` bằng `.btn-link:before { content: none; }`, TUYỆT ĐỐI KHÔNG để tồn tại đồng thời cả 2 pseudo-elements `::before` và `::after` trên cùng một nút.
 
 ## 5. Kiểm tra Hình ảnh
 - Kiểm tra toàn bộ hình ảnh đã được export.

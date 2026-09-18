@@ -90,10 +90,5 @@ description: Cấu trúc thư mục, kiến trúc giao diện, routing, quy tắ
     - **Tree Checkboxes**: Không dùng checked mặc định; Dùng CSS custom với FontAwesome checkmark (\f00c) để tương thích Dark/Light mode; Nút Check All ở card-header cần bù trừ padding (margin-right: -4px) để thẳng hàng với Checkbox con.
     - **Trạng thái Nút Action**: Vô hiệu hóa và đổi màu (btn-secondary) khi không có checkbox nào được chọn.
 
-# 4. Quy định về cấu trúc HTML / CSS
-- **Không lồng ghép thẻ bọc thừa (`.con-box02`) trong `.con-box`:** Đặt trực tiếp nội dung (`.table-wrap`, `.mark-p`, `.btn-box`,...) ngang hàng với thẻ `h4` ngay bên trong `.con-box` thay vì bọc thêm thẻ `div` `<div class="con-box02 no-pd">`.
-- **Không dùng thẻ bọc thừa (`.container-box`) trong `.btn-box`:** Đặt trực tiếp thẻ nút bấm (`<a>` hoặc `<button>`) ngay bên trong `<div class="btn-box">`, tuyệt đối không bọc thêm lớp `<div class="container-box">` ở giữa.
-- **Xử lý ký tự đặc biệt trong đoạn chú thích (`.mark-p`):** BẮT BUỘC XÓA BỎ ký tự hoa thị `※` ở đầu dòng của thẻ `<p class="mark-p">` (vì CSS đã tự động hiển thị). Tuyệt đối không giữ lại ký tự này.
-- **Xử lý padding cho đoạn văn cuối cùng:** Khi có một nhóm các đoạn văn bản (`<p class="con-p">`) liên tiếp nhau, hoặc nằm sát phía trên thẻ `.mark-p`, thì thẻ `<p>` **cuối cùng** bắt buộc phải được thêm class `no-pd` (`<p class="con-p no-pd">`) để triệt tiêu padding-bottom thừa.
-- **Xử lý Caption của Table (`<caption>`):** BẮT BUỘC phải có thẻ `<strong>` nằm trước thẻ `<span>` bên trong `<caption>`. Nội dung của thẻ `<strong>` phải được lấy từ text của thẻ tiêu đề `<h>` (VD: `h4`, `h5`) nằm ngay phía trên bảng đó. (VD: `<caption><strong>Tên Bảng</strong><span>Mô tả...</span></caption>`).
-- **Quy tắc định dạng danh sách (List):** KHÔNG được dùng thẻ `<p>` kèm `<br>` để hiển thị danh sách. Nếu đoạn văn bản có đánh số thứ tự (vd: 1., 2., 3.), BẮT BUỘC phải chuyển thành danh sách `<ol class="ol-type01">` và các thẻ `<li>`. Nếu là danh sách gạch đầu dòng (vd: -, •), dùng `<ul class="ul-type-dot">` hoặc `<ul class="ul-type-bar">` và các thẻ `<li>`.
+# 4. Quy định về cấu trúc HTML / CSS khi sinh trang (Generated Pages)
+- Toàn bộ quy chuẩn về cấu trúc HTML/CSS, heading hierarchy, rules bảng, danh sách, icon nút bấm và checklist kiểm tra chất lượng BẮT BUỘC tuân thủ tài liệu chuẩn duy nhất: `assets/ai_prompts/quality-checklist.md`.

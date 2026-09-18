@@ -63,7 +63,7 @@ CRITICAL STRUCTURE RULES TO STRICTLY ENFORCE:
 1. Do not use absolute positioning classes like `fg-*`. Use semantic Flex/Grid layout with margins and paddings.
 2. CRITICAL STRUCTURE RULE: For normal pages, you MUST wrap the entire page content in `<div class="content-box">`. BUT for Form interfaces (any UI containing text inputs, textareas, selects, checkboxes, or registration fields), you MUST strictly follow `form-template.html` and NEVER use `.content-box` or `.con-box`.
 3. For normal pages (inside `.content-box`), group related content into `<div class="con-box">` sections. The VERY LAST `<div class="con-box">` inside `.content-box` MUST have the class `no-pd`. {conbox_hint}
-4. HEADING HIERARCHY RULE: Headings MUST strictly follow their wrappers: `.con-box > h4.h4-tit01`, `.con-box02 > h5.h5-tit01`, and `.con-box03 > h6.h6-tit01`. Do not use them outside of their corresponding wrapper.
+4. HEADING HIERARCHY RULE: Direct heading of `.con-box` MUST ALWAYS be `h4.h4-tit01` (NEVER use `h5` or `h6` directly inside `.con-box`). Sub-headings `h5.h5-tit01` belong in `.con-box02` or inside child component boxes (`.bg-box`, `.notice-box`, `.info-wrap`). Sub-headings `h6.h6-tit01` belong in `.con-box03` or child component boxes. Do NOT add redundant wrapper divs (`.con-box02`, `.con-box03`) inside `.con-box` if a child component box already contains the sub-heading.
 5. CRITICAL CLASS NAMING: For normal pages, you MUST strictly use the exact class names from the structure template (e.g. `h4-tit01`, `h5-tit01`, `h6-tit01`, `con-p`). For Forms, you MUST strictly use the exact class names from form-template.html (e.g. `bn-write-common01`, `b-table-wrap`, `b-table-box`, `b-row-box`, `b-title-box`, `b-con-box`). For form elements, MUST use `b-input` (text), `b-select` (select), `b-input b-textarea` (textarea), `b-radio` (radio), `b-chk` (checkbox). DO NOT invent new classes.
 6. CRITICAL IMAGE RULE: Regular images MUST be standard `<img>` tags (do NOT remove or truncate repeating elements in lists/cards). However, if an image is a small icon (like an arrow, plus, or more icon) inside a button (`<a>` or `<button>`), you MUST remove the `<img>` tag from HTML and implement it entirely via CSS (e.g., using `background-image` on the button or its `::after` pseudo-element). DO NOT leave button icons as `<img>` tags!
 7. CRITICAL IMAGE PATH RULE: ALL image `src` paths MUST start with EXACTLY `./images/{slug_placeholder}/`. Do NOT invent folder names like `faculty` or `common`. For example, all images must be `./images/{slug_placeholder}/filename.png`.
@@ -72,6 +72,7 @@ CRITICAL STRUCTURE RULES TO STRICTLY ENFORCE:
 10. MARK-P SYMBOL RULE: You MUST ABSOLUTELY REMOVE the asterisk symbol `※` from the beginning of ANY text inside `<p class="mark-p">` and `<p class="mark-p01">`. Never output `※` inside these tags.
 11. TABLE CAPTION RULE: For Table `<caption>`, you MUST include a `<strong>` tag before the `<span>`. The text inside `<strong>` MUST be exactly copied from the text of the heading tag (`h4`, `h5`, etc.) located immediately above the table (e.g., `<caption><strong>Heading Text</strong><span>...</span></caption>`).
 12. LIST FORMATTING RULE: Do NOT use `<p>` tags with `<br>` to represent lists. If the text contains numbered items (e.g., 1., 2., 3.), you MUST convert it into an `<ol class="ol-type01">` with `<li>` tags. For bullet points (e.g., -, •), use `<ul class="ul-type-dot">` or `<ul class="ul-type-bar">` with `<li>` tags.
+13. CRITICAL BUTTON ICON & ARROW RULE: NEVER write arrow symbols or icon marks (e.g. ↗, →, ➔, ➜, ›, », ▼, ▲, +, ↓, etc.) as raw text or unicode characters inside button or link text (`<a>`, `<button>`, `.btn`, `.btn-link`, `.btn-file`, `.link-btn`). Any arrow or symbol in a button MUST be an ICON, not text! Use project classes when applicable (.btn-link already renders the diagonal open icon `ico-open.png` via `::before`; .btn-file renders `ico-download.png` via `::before`; .link-btn renders an arrow via `::after`). If a custom button has an icon/arrow, style via CSS pseudo-element `::before` OR `::after`. NEVER allow both `::before` and `::after` to render simultaneously on the same button! Prefer reusing or overriding the existing pseudo-element (.btn-link:before) instead of creating a new ::after. If you must use ::after, you MUST completely disable ::before (.btn-link:before {{ content: none; }}). The text inside the button MUST contain ONLY the clean label text (e.g., `<a class="btn btn-link" href="#" target="_blank" title="...">관련 링크 01</a>` WITHOUT any trailing arrow symbol like `↗`).
 TEMPLATE RULES TO FOLLOW:
 Structure template: 
 ```html
@@ -431,6 +432,31 @@ def parse_figma_fill(fills, image_map=None):
             return "solid", f"rgba({r}, {g}, {b}, {a})"
 
     return None, "transparent"
+
+
+def clean_button_text_arrows(html_content):
+    """Strip raw unicode arrow symbols and icon characters from button and link texts."""
+    if not html_content or not isinstance(html_content, str):
+        return html_content
+    import re
+    arrow_pattern = r'[↗↖↘↙→➔➜➝➞➟➡➢➣➤▲▼▶◀►◄›»‹«↓↑+]'
+    pattern = re.compile(
+        r'(<(?:a|button)\b[^>]*\bclass=["\'][^"\']*\b(?:btn|link-btn|b-btn)[^"\']*["\'][^>]*>)(.*?)(</(?:a|button)>)',
+        re.IGNORECASE | re.DOTALL
+    )
+    def _strip_arrow(m):
+        open_tag = m.group(1)
+        inner = m.group(2)
+        close_tag = m.group(3)
+        # Strip trailing arrow e.g. "Text ↗" or "<span>Text ↗</span>"
+        cleaned = re.sub(rf'\s*{arrow_pattern}+\s*(</[^>]+>)?$', r'\1', inner)
+        # Strip leading arrow e.g. "↗ Text"
+        cleaned = re.sub(rf'^(<[^>]+>)?\s*{arrow_pattern}+\s*', r'\1', cleaned)
+        # Strip arrow directly before closing tag
+        cleaned = re.sub(rf'\s*{arrow_pattern}+\s*(?=</)', '', cleaned)
+        return f"{open_tag}{cleaned}{close_tag}"
+
+    return pattern.sub(_strip_arrow, html_content)
 
 
 def strip_inline_styles(html_content, css_content):
@@ -971,7 +997,7 @@ Trả lời theo định dạng JSON sau (không thêm gì ngoài JSON, không b
                 
         if result:
             
-            new_html = result.get('html', html)
+            new_html = clean_button_text_arrows(result.get('html', html))
             new_css = result.get('css', css)
             new_js = result.get('js', js)
             rename_map = result.get('rename_map', [])
@@ -981,7 +1007,7 @@ Trả lời theo định dạng JSON sau (không thêm gì ngoài JSON, không b
     except Exception as e:
         print(f"[{menu_name}] Structural Refinement Error: {e}")
         
-    return html, css, js, []
+    return clean_button_text_arrows(html), css, js, []
 
 
 def compare_and_fix_visuals(token, figma_link, html, css, js, css_links, menu_name, gemini_api_key, task_id=None, local_image_path=None, local_image_paths=None):
@@ -1179,6 +1205,12 @@ SPECIAL ATTENTION FOR DIAGRAMS/CHARTS:
 - Connecting lines between boxes: use CSS ::before/::after pseudo-elements only.
 - Background colors must match exactly.
 
+⚠️ CRITICAL PRESERVATION RULES (MUST FOLLOW OR YOUR OUTPUT IS REJECTED):
+1. PRESERVE ALL CLASS NAMES: You MUST NOT rename, add, or remove any class name already present in the HTML. Use exactly the same class names as in "Current HTML" below.
+2. PRESERVE HTML STRUCTURE: You MUST NOT change the parent-child nesting hierarchy of the HTML. Only fix text content, attribute values (like src, alt), or add missing elements that are clearly visible in the design image.
+3. CSS FIXES ONLY: For NEEDS_FIX, you must output the COMPLETE CSS with corrections applied to property VALUES only (color, font-size, padding, margin, etc.). Do NOT rename selectors to different class names.
+4. NO HALLUCINATION: Only reference image filenames that already exist in "Current HTML" src attributes. Do NOT invent new file paths.
+
 Current HTML:
 {html}
 
@@ -1194,11 +1226,11 @@ STATUS: PERFECT
 
 STATUS: NEEDS_FIX
 ```html
-(corrected html)
+(corrected html — MUST keep every class name identical to Current HTML above)
 ```
 
 ```css
-(corrected css)
+(corrected css — MUST keep every selector identical to Current CSS above)
 ```
 """
 
@@ -1210,7 +1242,7 @@ STATUS: NEEDS_FIX
                 text = 'STATUS: NEEDS_FIX\n\n```html\n<div class="content-box"><div class="con-box"><h4 class="h4-tit01">Demo Title</h4><p class="con-p">Mock response.</p></div></div>\n```\n\n```css\n.content-box { padding: 20px; }\n```'
             else:
                 with compare_and_fix_visuals.api_lock:
-                    models_to_try = get_gemini_models_to_try(['gemini-2.0-flash-lite'])
+                    models_to_try = get_gemini_models_to_try(['gemini-3.1-flash-lite', 'gemini-3.5-flash-lite'])
                     text = None
                     last_error = None
                     for model in models_to_try:
@@ -1270,7 +1302,7 @@ STATUS: NEEDS_FIX
                         try:
                             # Fix: guard models_to_try scope (undefined khi DEMO_KEY hoặc list rỗng)
                             _verify_model = (models_to_try[0] if 'models_to_try' in dir() and models_to_try
-                                             else 'gemini-2.0-flash-lite')
+                                             else 'gemini-3.1-flash-lite')
                             # Fix: prompt phù hợp với số ảnh thực tế gửi đi
                             if target_pil:
                                 _verify_prompt = (
@@ -1310,7 +1342,7 @@ STATUS: NEEDS_FIX
                 import re
                 html_match = re.search(r'```html\n(.*?)\n```', text, re.DOTALL | re.IGNORECASE)
                 if html_match:
-                    html = html_match.group(1).strip()
+                    html = clean_button_text_arrows(html_match.group(1).strip())
                     
                 css_match = re.search(r'```css\n(.*?)\n```', text, re.DOTALL | re.IGNORECASE)
                 if css_match:
@@ -1330,7 +1362,7 @@ STATUS: NEEDS_FIX
             except Exception:
                 pass
 
-    return html, css, js
+    return clean_button_text_arrows(html), css, js
 
 
 # ---------------------------------------------------------------------------
@@ -1537,7 +1569,7 @@ To ensure extreme accuracy, you MUST follow this Chain-of-Thought pipeline befor
 CRITICAL RULE ABOUT IMAGES & ICONS (ABSOLUTELY NO HALLUCINATIONS):
 - The server DOES NOT have any pre-cropped icon or image files! There are NO image files available except `source_image_0.jpg` if provided.
 - DO NOT invent, guess, or hallucinate image paths like `<img src="./images/.../some_icon.png">` or `<img src="./images/.../sdg_icon.png">`.
-- ANY colored boxes, SDG badges, icons, arrows, number badges, or logos MUST be built using PURE HTML & CSS (e.g. background-color, border, border-radius, SVG data URI, or CSS ::before / ::after). NEVER put an <img> tag for an icon or box!
+- ANY colored boxes, SDG badges, icons, arrows, number badges, or logos MUST be built using PURE HTML & CSS (e.g. background-color, border, border-radius, or CSS ::before / ::after with PNG / pure CSS). NEVER put an <img> tag for an icon or box, and NEVER write arrow symbols (↗, →, ›, etc.) as plain text inside buttons!
 - Only use an <img> tag if you are referencing an actual uploaded image `source_image_0.jpg`.
 
 {unified_rules}
@@ -1683,16 +1715,29 @@ Return ONLY a valid JSON object matching this schema without markdown formatting
 
             html_result = img_src_pattern.sub(_clean_missing_img, html_result)
 
+        html_result = clean_button_text_arrows(html_result)
+
         # Write files
         html_path = os.path.join(target_dir, f"{menu_slug}.html")
         css_path = os.path.join(target_dir, f"{menu_slug}.css")
         js_path = os.path.join(target_dir, f"{menu_slug}.js")
 
         base_style_src = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'layout', 'style.css')
+        site_root_dir = os.path.join(OUTPUT_DIR, site_id)
+        os.makedirs(site_root_dir, exist_ok=True)
         if os.path.exists(base_style_src):
-            site_root_dir = os.path.join(OUTPUT_DIR, site_id)
-            os.makedirs(site_root_dir, exist_ok=True)
             shutil.copy(base_style_src, os.path.join(site_root_dir, "style.css"))
+
+        common_img_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'img', 'common')
+        if os.path.exists(common_img_dir):
+            site_img_common = os.path.join(site_root_dir, "img", "common")
+            os.makedirs(site_img_common, exist_ok=True)
+            for f in os.listdir(common_img_dir):
+                shutil.copy(os.path.join(common_img_dir, f), os.path.join(site_img_common, f))
+            if os.path.exists(images_dir):
+                for icon_name in os.listdir(common_img_dir):
+                    if icon_name in css_result or icon_name in html_result:
+                        shutil.copy(os.path.join(common_img_dir, icon_name), os.path.join(images_dir, icon_name))
 
         style_href = "../style.css" if folder else "style.css"
         js_script = f'    <script src="{menu_slug}.js"></script>\n' if js_result else ""

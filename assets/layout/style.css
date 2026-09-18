@@ -28,6 +28,8 @@ html {
 .no-pbt{padding-top: 0!important}
 .bd-p{border: 1px solid #CCC;padding: 25px 30px;color: #222;font-size: 16px;font-weight: 400;line-height: 26px;}
 
+.ul-type-bar, .ul-type-dot, .ul-type-normal, .ol-type01{list-style: none; padding-left: 0; margin-left: 0;}
+
 .ul-type-bar > li{position:relative;padding:0 0 5px 15px;line-height: 140%;font-size: 16px;font-weight: 500;color: #666666;}
 .ul-type-bar > li:before{content:'';position:absolute;top:8px;left:0;width:8px;height:2px;background-color:#666666;}
 .ul-type-bar > li:last-child{padding-bottom: 0;}
