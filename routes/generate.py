@@ -1074,7 +1074,7 @@ def compare_and_fix_visuals(token, figma_link, html, css, js, css_links, menu_na
 
     client = genai.Client(api_key=gemini_api_key)
     client_2 = genai.Client(api_key=gemini_api_key_2) if gemini_api_key_2 else None
-    MAX_ITERATIONS = 3
+    MAX_ITERATIONS = 2
     for iteration in range(1, MAX_ITERATIONS + 1):
         if task_id and GENERATE_TASKS.get(task_id, {}).get('status') == 'cancelled':
             raise Exception("CANCELLED_BY_USER")
@@ -1114,7 +1114,7 @@ def compare_and_fix_visuals(token, figma_link, html, css, js, css_links, menu_na
                 file_url = 'file:///' + temp_html_path.replace('\\', '/')
                 await page.goto(file_url)
                 import asyncio as _asyncio
-                await _asyncio.sleep(2)
+                await _asyncio.sleep(0.5)
                 await page.screenshot(path=render_img_path, full_page=True)
                 await browser.close()
 
@@ -1135,24 +1135,24 @@ def compare_and_fix_visuals(token, figma_link, html, css, js, css_links, menu_na
 
         print(f"[{menu_name}] Sending visual comparison to Gemini (Iteration {iteration})...")
         if target_pil:
-            prompt_header = "Perform a strict quality verification comparing the 2 images:\n- Image 1: Figma design.\n- Image 2: Current HTML/CSS render.\n\nGoal: Ensure 100% visual match between HTML/CSS render and Figma design!"
+            prompt_header = "Compare Image 1 (Figma design) vs Image 2 (HTML/CSS render). Find every visual difference."
         else:
-            prompt_header = "Perform a strict quality verification of the current HTML/CSS render image.\n\nGoal: Ensure 100% compliance with structural rules!"
+            prompt_header = "Inspect this HTML/CSS render. Find every structural or visual issue."
 
         unified_rules = get_unified_ai_rules("", css_links, menu_slug=menu_name)
-        
-        prompt = f"""You are an expert Frontend Developer. {prompt_header}
 
-Checklist to strictly enforce:
+        prompt = f"""You are a strict Frontend QA Engineer. {prompt_header}
+
+Your default assumption: the render is WRONG. Your job is to FIND differences, not confirm correctness.
+
+Checklist (check every item):
 {quality_checklist}
 
 {unified_rules}
 
-CRITICAL INSTRUCTION: Do NOT return "PERFECT" unless you have thoroughly checked ALL checklist steps pixel-by-pixel. 
-SPECIAL ATTENTION FOR DIAGRAMS/CHARTS: If the Figma design contains connecting lines, grid boxes, flowcharts, or complex box structures:
-1. For connecting lines and arrows between boxes, you ONLY need to use CSS pseudo-elements (::before and ::after) on the boxes to draw them. Do not overcomplicate it with unnecessary HTML tags.
-2. The background colors of the boxes MUST match EXACTLY.
-3. If there is ANY difference in layout, fonts, margins, responsiveness, lines, or colors, you MUST return "NEEDS_FIX" and provide the corrected HTML and CSS.
+SPECIAL ATTENTION FOR DIAGRAMS/CHARTS:
+- Connecting lines between boxes: use CSS ::before/::after pseudo-elements only.
+- Background colors must match exactly.
 
 Current HTML:
 {html}
@@ -1160,15 +1160,20 @@ Current HTML:
 Current CSS:
 {css}
 
-Return your response exactly in this markdown format:
-STATUS: PERFECT (or NEEDS_FIX)
+Mandatory format:
+ISSUES:
+- [describe each visual/structural difference found, or write "None" if truly none]
 
+STATUS: PERFECT
+(only if ISSUES is "None" and you are 95%+ confident after checking all checklist items)
+
+STATUS: NEEDS_FIX
 ```html
-(put html here if NEEDS_FIX)
+(corrected html)
 ```
 
 ```css
-(put css here if NEEDS_FIX)
+(corrected css)
 ```
 """
 
@@ -1223,7 +1228,7 @@ STATUS: PERFECT (or NEEDS_FIX)
                     if not text and last_error:
                         print(f"[{menu_name}] Warning: Gemini API call failed ({last_error}).")
                         if task_id and task_id in GENERATE_TASKS:
-                            GENERATE_TASKS[task_id]['message'] = f"AI Quality Check ({iteration}/3) Failed. Fallback to semantic rules."
+                            GENERATE_TASKS[task_id]['message'] = f"AI Quality Check ({iteration}/{MAX_ITERATIONS}) Failed. Fallback to semantic rules."
                             import time
                             time.sleep(2)
                         continue
@@ -1232,12 +1237,47 @@ STATUS: PERFECT (or NEEDS_FIX)
                 status = "PERFECT" if "STATUS: PERFECT" in text.upper() else "NEEDS_FIX"
 
                 if status == 'PERFECT':
-                    if iteration < 2:
-                        print(f"[{menu_name}] AI claimed PERFECT on iteration {iteration}. Forcing double-check...")
+                    if iteration == 1:
+                        # Lightweight verify: chỉ gửi ảnh, không HTML/CSS → tiết kiệm token
+                        print(f"[{menu_name}] AI claimed PERFECT on iter 1. Running lightweight verify...")
                         if task_id and task_id in GENERATE_TASKS:
-                            GENERATE_TASKS[task_id]['message'] = f"AI Quality Check ({iteration}/3): Double-checking for strict adherence..."
-                            import time
-                            time.sleep(1)
+                            GENERATE_TASKS[task_id]['message'] = f"AI Quality Check: Verifying PERFECT claim..."
+                        try:
+                            # Fix: guard models_to_try scope (undefined khi DEMO_KEY hoặc list rỗng)
+                            _verify_model = (models_to_try[0] if 'models_to_try' in dir() and models_to_try
+                                             else 'gemini-2.0-flash-lite')
+                            # Fix: prompt phù hợp với số ảnh thực tế gửi đi
+                            if target_pil:
+                                _verify_prompt = (
+                                    "Quick visual check: Compare these two images (Figma design vs HTML render).\n"
+                                    "List any differences you can spot (be precise).\n"
+                                    "DIFFERENCES: [list each one, or write \"None\"]\n"
+                                    "VERDICT: MATCH (if no differences) or MISMATCH (if any difference found)"
+                                )
+                            else:
+                                _verify_prompt = (
+                                    "Quick visual check: Inspect this rendered HTML image for any severe visual bugs or flaws.\n"
+                                    "List any issues you can spot.\n"
+                                    "DIFFERENCES: [list each one, or write \"None\"]\n"
+                                    "VERDICT: MATCH (if no issues found) or MISMATCH (if any issue found)"
+                                )
+                            _verify_contents = [_verify_prompt]
+                            if target_pil:
+                                _verify_contents.append(target_pil)
+                            _verify_contents.append(render_pil)
+                            with compare_and_fix_visuals.api_lock:
+                                _vresp = client.models.generate_content(
+                                    model=_verify_model,
+                                    contents=_verify_contents
+                                )
+                            if _vresp and _vresp.text and 'VERDICT: MATCH' in _vresp.text.upper():
+                                print(f"[{menu_name}] Lightweight verify CONFIRMED PERFECT! Early exit.")
+                                break
+                            else:
+                                _diff_info = _vresp.text.strip()[:200] if _vresp and _vresp.text else 'unknown'
+                                print(f"[{menu_name}] False PERFECT caught! Verify: {_diff_info}")
+                        except Exception as _ve:
+                            print(f"[{menu_name}] Lightweight verify error: {_ve}. Forcing double-check.")
                     else:
                         print(f"[{menu_name}] Visual match is PERFECT at iteration {iteration}!")
                         break

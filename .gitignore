@@ -7,10 +7,6 @@ node.json
 output/
 data/
 
-agents.md
-.agents/
-
-AGENTS.md
 scratch/
 videos/
 playwright_data/
