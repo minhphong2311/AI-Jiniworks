@@ -193,6 +193,7 @@ def download_and_map_figma_images(image_map, target_dir, menu_slug, used_refs=No
     if not image_map:
         return {}
     import urllib.request
+    from concurrent.futures import ThreadPoolExecutor
 
     images_dir = os.path.join(target_dir, "images", menu_slug)
     os.makedirs(images_dir, exist_ok=True)
@@ -215,35 +216,35 @@ def download_and_map_figma_images(image_map, target_dir, menu_slug, used_refs=No
                 max_idx = max(max_idx, int(idx_str))
 
     local_image_map = {}
+    tasks = []
 
     for ref, url in image_map.items():
         if used_refs is not None and ref not in used_refs:
             continue
         if url:
+            if ref in ref_to_filename:
+                filename = ref_to_filename[ref]
+            else:
+                max_idx += 1
+                filename = f"{menu_slug}-{max_idx:02d}.jpg"
+                ref_to_filename[ref] = filename
+            local_image_map[ref] = f"./images/{menu_slug}/{filename}"
+            tasks.append((ref, url, os.path.join(images_dir, filename)))
+
+    def _fetch_one(item):
+        r, u, lp = item
+        if not os.path.exists(lp):
             try:
-                if ref in ref_to_filename:
-                    filename = ref_to_filename[ref]
-                    local_path = os.path.join(images_dir, filename)
-                    if not os.path.exists(local_path):
-                        with urllib.request.urlopen(url) as response:
-                            with open(local_path, 'wb') as f:
-                                f.write(response.read())
-                else:
-                    with urllib.request.urlopen(url) as response:
-                        content_type = response.headers.get('Content-Type', '')
-                        ext = 'jpg' if 'jpeg' in content_type.lower() or 'jpg' in content_type.lower() else 'png'
-                        max_idx += 1
-                        filename = f"{menu_slug}-{max_idx:02d}.{ext}"
-                        ref_to_filename[ref] = filename
-
-                        local_path = os.path.join(images_dir, filename)
-                        with open(local_path, 'wb') as f:
-                            f.write(response.read())
-
-                local_image_map[ref] = f"./images/{menu_slug}/{filename}"
+                req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=15) as response:
+                    with open(lp, 'wb') as f:
+                        f.write(response.read())
             except Exception as e:
-                print(f"Failed to download image {ref}: {e}")
-                local_image_map[ref] = url
+                print(f"Failed to download image {r}: {e}")
+
+    if tasks:
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            list(executor.map(_fetch_one, tasks))
 
     try:
         with open(map_file, 'w', encoding='utf-8') as f:
@@ -256,52 +257,67 @@ def download_and_map_figma_images(image_map, target_dir, menu_slug, used_refs=No
 
 def export_figma_icons(file_key, document, token, target_dir, menu_slug):
     """Export icon nodes from Figma as PNG files.
-    Icons are identified as non-text nodes with both width and height <= 48px."""
+    Smart filtering ensures only real icons are exported, avoiding tiny layout shapes, lines, or table borders."""
     import requests
     import urllib.request
+    import hashlib
+    import re
+    from concurrent.futures import ThreadPoolExecutor
 
-    icon_nodes = []  # list of (node_id, clean_name)
     seen_ids = set()
+    icon_nodes = []  # list of (node_id, clean_name)
 
-    def has_text(n):
-        if n.get('type') == 'TEXT':
-            return True
-        for c in n.get('children', []):
-            if has_text(c):
-                return True
-        return False
+    def has_text(x):
+        return x.get('type') == 'TEXT' or any(has_text(c) for c in x.get('children', []))
 
-    def find_icon_nodes(node):
-        node_id = node.get('id', '')
-        name = node.get('name', '')
+    def is_real_icon(node):
         t = node.get('type', '')
         bb = node.get('absoluteBoundingBox', {})
-        w = bb.get('width', 0)
-        h = bb.get('height', 0)
-        fills = node.get('fills', [])
-        has_image_fill = any(f.get('type') == 'IMAGE' for f in fills)
-        
-        if (
-            node_id
-            and node_id not in seen_ids
-            and t not in ('TEXT', 'DOCUMENT', 'CANVAS', 'PAGE')
-            and w > 0 and h > 0
-            and w <= 128 and h <= 128
-            and not has_image_fill
-            and not has_text(node)
-        ):
-            clean_name = "".join([c.lower() if c.isalnum() else '-' for c in name])
-            import re
-            clean_name = re.sub(r'-+', '-', clean_name).strip('-')
-            
-            # If name is empty or very generic, fallback to menu_slug
-            if not clean_name or clean_name in ['group', 'frame', 'vector', 'image', 'icon', 'rectangle', 'ellipse', 'star', 'line', 'polygon']:
-                clean_name = menu_slug
-                
-            seen_ids.add(node_id)
-            icon_nodes.append((node_id, clean_name))
+        w, h = bb.get('width', 0), bb.get('height', 0)
+        name = node.get('name', '').lower()
+
+        # Loại bỏ các hình học CSS cơ bản và layout thuần túy
+        if t in ('TEXT', 'DOCUMENT', 'CANVAS', 'PAGE', 'SECTION', 'LINE', 'RECTANGLE', 'ELLIPSE'):
+            return False
+        # Kích thước icon chuẩn từ 10px đến 80px
+        if w < 10 or h < 10 or w > 80 or h > 80:
+            return False
+        # Loại bỏ các thanh divider / kẻ dọc quá dẹt
+        ratio = max(w, h) / max(min(w, h), 0.1)
+        if ratio > 2.5:
+            return False
+        if has_text(node):
+            return False
+        if any(f.get('type') == 'IMAGE' for f in node.get('fills', [])):
+            return False
+
+        # Icon chuẩn: Component, Instance, Vector, Boolean, hoặc Frame có tên biểu thị icon
+        if t in ('INSTANCE', 'COMPONENT', 'COMPONENT_SET', 'VECTOR', 'BOOLEAN_OPERATION'):
+            return True
+        if any(k in name for k in ['icon', 'ic_', 'ico', 'svg', 'arrow', 'home', 'btn', 'logo', 'glyph']):
+            return True
+        # Nếu là Frame/Group, chỉ nhận nếu có vector con trực tiếp bên trong
+        children = node.get('children', [])
+        if children and any(c.get('type') in ('VECTOR', 'BOOLEAN_OPERATION') for c in children):
+            return True
+        return False
+
+    MAX_ICONS = 30
+
+    def find_icon_nodes(node):
+        if len(icon_nodes) >= MAX_ICONS:
             return
-            
+        node_id = node.get('id', '')
+        if node_id and node_id not in seen_ids:
+            if is_real_icon(node):
+                clean_name = "".join([c.lower() if c.isalnum() else '-' for c in node.get('name', '')])
+                clean_name = re.sub(r'-+', '-', clean_name).strip('-')
+                if not clean_name or clean_name in ['group', 'frame', 'vector', 'image', 'icon', 'rectangle', 'ellipse', 'star', 'line', 'polygon']:
+                    clean_name = menu_slug
+                seen_ids.add(node_id)
+                icon_nodes.append((node_id, clean_name))
+                return  # Đã nhận là 1 icon thì không bóc tách các sub-vectors li ti bên trong!
+
         for child in node.get('children', []):
             find_icon_nodes(child)
 
@@ -311,12 +327,11 @@ def export_figma_icons(file_key, document, token, target_dir, menu_slug):
     if not icon_nodes:
         return icon_map
 
-    print(f"[Figma] Exporting {len(icon_nodes)} icon nodes as PNG...")
+    print(f"[Figma] Exporting {len(icon_nodes)} real icon nodes as PNG...")
     headers = {'X-Figma-Token': token}
     images_dir = os.path.join(target_dir, "images", menu_slug)
     os.makedirs(images_dir, exist_ok=True)
 
-    import hashlib
     content_hash_to_filename = {}
 
     batch_size = 100
@@ -325,40 +340,52 @@ def export_figma_icons(file_key, document, token, target_dir, menu_slug):
         ids_str = ",".join(nid for nid, _ in batch)
         url = f"https://api.figma.com/v1/images/{file_key}?ids={ids_str}&format=png&scale=2"
         try:
-            r = requests.get(url, headers=headers, timeout=30)
+            r = requests.get(url, headers=headers, timeout=20)
             if r.status_code != 200:
                 print(f"[Figma] Icon export API error: {r.status_code} {r.text[:200]}")
                 continue
             images_resp = r.json().get('images', {})
+            
+            download_items = []
             for node_id, clean_name in batch:
                 img_url = images_resp.get(node_id)
-                if not img_url:
-                    continue
+                if img_url:
+                    download_items.append((node_id, clean_name, img_url))
+
+            def _download_icon(item):
+                nid, cname, u = item
                 try:
-                    with urllib.request.urlopen(img_url) as resp:
-                        img_bytes = resp.read()
-                        
-                    img_hash = hashlib.md5(img_bytes).hexdigest()
-                    
-                    if img_hash in content_hash_to_filename:
-                        final_name = content_hash_to_filename[img_hash]
-                    else:
-                        existing_count = sum(1 for fn in content_hash_to_filename.values() if fn.startswith(clean_name))
-                        index = existing_count + 1
-                        final_name = f"{clean_name}-{index:02d}.png"
-                        local_path = os.path.join(images_dir, final_name)
-                        with open(local_path, 'wb') as f:
-                            f.write(img_bytes)
-                        content_hash_to_filename[img_hash] = final_name
-                        print(f"[Figma] Saved image: {final_name}")
-                        
-                    icon_map[node_id] = f"./images/{menu_slug}/{final_name}"
+                    req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        data = resp.read()
+                    return (nid, cname, data)
                 except Exception as e:
-                    print(f"[Figma] Failed to process image {clean_name}: {e}")
+                    print(f"[Figma] Failed to download icon {cname}: {e}")
+                    return (nid, cname, None)
+
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                results = list(executor.map(_download_icon, download_items))
+
+            for nid, cname, img_bytes in results:
+                if not img_bytes:
+                    continue
+                img_hash = hashlib.md5(img_bytes).hexdigest()
+                if img_hash in content_hash_to_filename:
+                    final_name = content_hash_to_filename[img_hash]
+                else:
+                    existing_count = sum(1 for fn in content_hash_to_filename.values() if fn.startswith(cname))
+                    final_name = f"{cname}-{existing_count + 1:02d}.png"
+                    local_path = os.path.join(images_dir, final_name)
+                    with open(local_path, 'wb') as f:
+                        f.write(img_bytes)
+                    content_hash_to_filename[img_hash] = final_name
+                    print(f"[Figma] Saved icon: {final_name}")
+                icon_map[nid] = f"./images/{menu_slug}/{final_name}"
         except Exception as e:
             print(f"[Figma] Failed to export icons batch: {e}")
 
     return icon_map
+
 
 
 def parse_figma_fill(fills, image_map=None):
@@ -1509,6 +1536,12 @@ To ensure extreme accuracy, you MUST follow this Chain-of-Thought pipeline befor
 4. OCR / read text: Extract ALL text exactly as it appears in the image, ensuring you don't miss small details.
 5. Component identification: Identify all specific UI components like buttons, connecting arrows, lines, and boxes.
 
+CRITICAL RULE ABOUT IMAGES & ICONS (ABSOLUTELY NO HALLUCINATIONS):
+- The server DOES NOT have any pre-cropped icon or image files! There are NO image files available except `source_image_0.jpg` if provided.
+- DO NOT invent, guess, or hallucinate image paths like `<img src="./images/.../some_icon.png">` or `<img src="./images/.../sdg_icon.png">`.
+- ANY colored boxes, SDG badges, icons, arrows, number badges, or logos MUST be built using PURE HTML & CSS (e.g. background-color, border, border-radius, SVG data URI, or CSS ::before / ::after). NEVER put an <img> tag for an icon or box!
+- Only use an <img> tag if you are referencing an actual uploaded image `source_image_0.jpg`.
+
 {unified_rules}
 
 Return ONLY a valid JSON object matching this schema without markdown formatting:
@@ -1622,6 +1655,36 @@ Return ONLY a valid JSON object matching this schema without markdown formatting
             raise Exception("No Figma link or uploaded image found for this page.")
 
         check_cancel_and_update("Saving generated files...")
+        # Reconcile image references: đảm bảo mọi thẻ img hoặc CSS url khớp chính xác phần mở rộng file thực tế trên đĩa
+        images_dir = os.path.join(target_dir, "images", menu_slug)
+        if os.path.exists(images_dir):
+            existing_files = os.listdir(images_dir)
+            for f in existing_files:
+                stem, ext = os.path.splitext(f)
+                if ext.lower() in ['.jpg', '.jpeg', '.png', '.webp', '.svg']:
+                    for alt_ext in ['.png', '.jpg', '.jpeg', '.webp']:
+                        wrong_ref = f"{stem}{alt_ext}"
+                        if wrong_ref != f:
+                            html_result = html_result.replace(wrong_ref, f)
+                            css_result = css_result.replace(wrong_ref, f)
+
+            # Xử lý triệt để thẻ <img> ma (ghost images hoàn toàn không có file trên đĩa)
+            import re
+            img_src_pattern = re.compile(r'<img\s+([^>]*?)src=["\']([^"\']*?/images/' + re.escape(menu_slug) + r'/([^"\']+))["\']([^>]*?)>', re.IGNORECASE)
+            def _clean_missing_img(match):
+                full_tag = match.group(0)
+                file_name = match.group(3)
+                if not os.path.exists(os.path.join(images_dir, file_name)):
+                    alt_match = re.search(r'alt=["\']([^"\']*)["\']', full_tag, re.IGNORECASE)
+                    alt_text = alt_match.group(1) if alt_match else ""
+                    print(f"[{menu_slug}] Cleaned ghost image reference: {file_name} (alt: '{alt_text}')")
+                    if alt_text:
+                        return f'<span class="img-badge-text">{alt_text}</span>'
+                    return ''
+                return full_tag
+
+            html_result = img_src_pattern.sub(_clean_missing_img, html_result)
+
         # Write files
         html_path = os.path.join(target_dir, f"{menu_slug}.html")
         css_path = os.path.join(target_dir, f"{menu_slug}.css")

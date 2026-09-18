@@ -2,7 +2,7 @@
 2. COLORS & BACKGROUNDS: Verify every single text color, background color, gradient, and border color. If a hex code doesn't perfectly match the visual shade in Figma, report NEEDS_FIX.
 3. TYPOGRAPHY: Ensure font-weights, font-sizes, line-heights, and letter-spacing are identical. Pay special attention to headings vs body text.
 4. BORDERS & DIVIDERS (LINES): Look for subtle borders, underlines, dividers, or connecting lines. For connecting lines between boxes, you ONLY need to use CSS pseudo-elements (::before and ::after) on the boxes to draw them. If a line is missing, too thick/thin, or the wrong color, report NEEDS_FIX.
-5. ICONS & ARROWS: Check every icon, especially small arrows in buttons, bullet points, or list markers. If an arrow is missing, wrong shape, wrong color, or rendered as text instead of an image/CSS-icon, report NEEDS_FIX. (Remember the critical rule: button icons must be implemented via CSS background-image or ::after, not <img> tags).
+5. ICONS & ARROWS: Check every icon, especially small arrows in buttons, bullet points, or list markers. If an arrow is missing, wrong shape, wrong color, or rendered as text instead of an image/CSS-icon, report NEEDS_FIX. (Remember the critical rule: button icons must be implemented via CSS background-image (.png) or ::after, never use inline <svg> or data:image/svg+xml).
 6. SHADOWS & EFFECTS: Verify box-shadows, opacities, and hover effects if visible.
 7. RESPONSIVE STRUCTURE: Ensure no content overflows or overlaps incorrectly. The structure must be fluid and logical.
 

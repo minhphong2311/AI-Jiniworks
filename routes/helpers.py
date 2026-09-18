@@ -96,7 +96,7 @@ def get_gemini_models_to_try(extra_models=None):
     if user_models:
         candidates.extend(user_models)
     else:
-        candidates.append('gemini-3.8-flash')
+        candidates.append('gemini-3.6-flash')
 
     if extra_models:
         if isinstance(extra_models, list):
@@ -105,10 +105,9 @@ def get_gemini_models_to_try(extra_models=None):
             candidates.append(extra_models)
 
     candidates.extend([
-        'gemini-3.8-flash',
         'gemini-3.6-flash',
         'gemini-3.5-flash',
-        'gemini-2.0-flash',
+        'gemini-3.8-flash',
         'gemini-flash-latest'
     ])
 
@@ -336,7 +335,7 @@ def get_css_guide_instruction(css_links=None):
         "}\n"
         "2. THỨ TỰ THUỘC TÍNH TEXT (NHƯ FIGMA): BẮT BUỘC sắp xếp các thuộc tính text theo đúng thứ tự sau: font-family, font-weight, font-size, line-height, color.\n"
         "VD: `.txt01{font-family: 'Pretendard';font-weight: 700;font-size: 32px;line-height: 120%;color: #262626;}`\n"
-        "3. SỬ DỤNG ẢNH PNG CHO ICON: BẮT BUỘC sử dụng thẻ <img> với định dạng PNG (vd: <img src=\"./images/menu_slug/icon_name.png\" alt=\"icon\">) cho tất cả các icon thay vì sử dụng thẻ span hay font icon. Đối với các icon nhỏ nằm trong các thẻ a, button, KHÔNG dùng thẻ img mà dùng css background-image hoặc pseudo-element (::before, ::after).\n"
+        "3. SỬ DỤNG ẢNH PNG CHO ICON - TUYỆT ĐỐI KHÔNG DÙNG SVG: BẮT BUỘC sử dụng thẻ <img> với định dạng PNG (vd: <img src=\"./images/menu_slug/icon_name.png\" alt=\"icon\">) cho tất cả các icon thay vì sử dụng thẻ span hay font icon. TUYỆT ĐỐI KHÔNG sử dụng thẻ <svg> trực tiếp trong HTML hoặc mã data:image/svg+xml trong CSS. Đối với các icon nhỏ nằm trong các thẻ a, button, KHÔNG dùng thẻ img và KHÔNG dùng svg, mà dùng file ảnh .png qua css background-image hoặc vẽ bằng CSS thuần / pseudo-element (::before, ::after, border, transform).\n"
         "4. RESPONSIVE DESIGN LÀ BẮT BUỘC: Mọi giao diện sinh ra phải hỗ trợ Responsive (co giãn tốt trên Mobile, Tablet, PC).\n"
         "5. ĐƯỜNG NỐI SƠ ĐỒ TỔ CHỨC: Đối với sơ đồ cây/tổ chức (có đường nối ngang/dọc), BẮT BUỘC dùng CSS pseudo-elements (::before, ::after) để vẽ đường kẻ. Không dùng <div> trống làm đường kẻ.\n"
         "6. JAVASCRIPT: Code Javascript (nếu có) BẮT BUỘC phải được format bình thường với đầy đủ xuống dòng (newline) và thụt lề (indentation). TUYỆT ĐỐI KHÔNG được ép Javascript thành 1 dòng (minify).\n"

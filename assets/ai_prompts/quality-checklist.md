@@ -28,6 +28,7 @@
 - Kiểm tra cấu trúc cha - con (Hierarchy).
 - Kiểm tra sử dụng đúng thẻ HTML theo quy chuẩn của dự án.
 - Kiểm tra không có thẻ HTML hoặc phần tử dư thừa.
+- Kiểm tra TUYỆT ĐỐI KHÔNG sử dụng thẻ <svg> trực tiếp trong HTML.
 
 ## 4. Kiểm tra Class và Rule
 - Kiểm tra class được đặt đúng theo quy chuẩn của dự án.
@@ -47,17 +48,19 @@
 
 ## 5. Kiểm tra Hình ảnh
 - Kiểm tra toàn bộ hình ảnh đã được export.
-- Kiểm tra hình ảnh sử dụng đúng định dạng (.jpg hoặc .png).
+- Kiểm tra hình ảnh sử dụng đúng định dạng .jpg.
 - Kiểm tra đúng kích thước theo thiết kế.
 - Kiểm tra đúng tỷ lệ, không bị méo hoặc cắt.
 - Kiểm tra đúng đường dẫn hình ảnh.
-- Kiểm tra icon không bị mờ hoặc vỡ hình.
+- Kiểm tra icon không bị mờ hoặc vỡ hình và sử dụng đúng định dạng .png.
+- Kiểm tra TUYỆT ĐỐI KHÔNG sử dụng định dạng .svg (cả file .svg, thẻ <svg>, lẫn mã data:image/svg+xml trong CSS).
 
 ## 6. Kiểm tra CSS
 - Kiểm tra CSS đúng với thiết kế.
 - Kiểm tra không có CSS trùng lặp.
 - Kiểm tra không có CSS dư thừa.
 - Kiểm tra không sử dụng inline style.
+- Kiểm tra không sử dụng mã data:image/svg+xml trong CSS background-image.
 - Kiểm tra animation và transition (nếu có).
 
 ## 7. Kiểm tra Responsive

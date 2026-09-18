@@ -186,12 +186,39 @@ def preview_asset_folder(site_id, folder, filename):
     file_path = os.path.join(dir_path, filename)
     if os.path.exists(file_path):
         return send_from_directory(dir_path, filename)
-    
+
+    # Fallback thử các extension ảnh phổ biến nếu lệch đuôi (vd: gọi .png nhưng thực tế là .jpg)
+    name_no_ext, ext = os.path.splitext(filename)
+    if ext.lower() in ['.png', '.jpg', '.jpeg', '.webp', '.svg']:
+        for alt_ext in ['.jpg', '.png', '.jpeg', '.webp', '.svg']:
+            alt_filename = name_no_ext + alt_ext
+            if os.path.exists(os.path.join(dir_path, alt_filename)):
+                return send_from_directory(dir_path, alt_filename)
+
     site_root = os.path.join(OUTPUT_DIR, site_id)
+    if os.path.exists(os.path.join(site_root, filename)):
+        return send_from_directory(site_root, filename)
+
+    if ext.lower() in ['.png', '.jpg', '.jpeg', '.webp', '.svg']:
+        for alt_ext in ['.jpg', '.png', '.jpeg', '.webp', '.svg']:
+            alt_filename = name_no_ext + alt_ext
+            if os.path.exists(os.path.join(site_root, alt_filename)):
+                return send_from_directory(site_root, alt_filename)
+
     return send_from_directory(site_root, filename)
 
 
 @preview_bp.route('/preview/raw/<site_id>/<path:filename>')
 def preview_asset_no_folder(site_id, filename):
     site_root = os.path.join(OUTPUT_DIR, site_id)
+    if os.path.exists(os.path.join(site_root, filename)):
+        return send_from_directory(site_root, filename)
+
+    name_no_ext, ext = os.path.splitext(filename)
+    if ext.lower() in ['.png', '.jpg', '.jpeg', '.webp', '.svg']:
+        for alt_ext in ['.jpg', '.png', '.jpeg', '.webp', '.svg']:
+            alt_filename = name_no_ext + alt_ext
+            if os.path.exists(os.path.join(site_root, alt_filename)):
+                return send_from_directory(site_root, alt_filename)
+
     return send_from_directory(site_root, filename)
